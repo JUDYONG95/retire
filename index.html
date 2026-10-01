@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retirement Runway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-pane tool — inputs rail on the left, verdict + runway chart on the right; stacks on phones */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #17221f;
+  --muted: #5d6b67;
+  --line: #dde3e1;
+  --accent: #1e6b57;      /* saving phase */
+  --accent-soft: #1e6b5722;
+  --draw: #b7742a;        /* drawdown phase */
+  --draw-soft: #b7742a26;
+  --good: #1e7a4a;
+  --warn: #b5482f;
+  --good-bg: #e3f2ea;
+  --warn-bg: #f8e6e1;
+  --font-display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111816; --surface: #19221f; --ink: #e6ece9; --muted: #95a39e; --line: #2b3733;
+    --accent: #4fbf9c; --accent-soft: #4fbf9c26; --draw: #e0a25a; --draw-soft: #e0a25a26;
+    --good: #5fd08f; --warn: #f08a70; --good-bg: #173326; --warn-bg: #3a201a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111816; --surface: #19221f; --ink: #e6ece9; --muted: #95a39e; --line: #2b3733;
+  --accent: #4fbf9c; --accent-soft: #4fbf9c26; --draw: #e0a25a; --draw-soft: #e0a25a26;
+  --good: #5fd08f; --warn: #f08a70; --good-bg: #173326; --warn-bg: #3a201a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 24px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { color: var(--muted); margin: 6px 0 0; max-width: 60ch; }
+.cur { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+select, input[type="number"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.inputs { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 20px 20px; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 14px; padding-top: 16px; }
+fieldset + fieldset { border-top: 1px solid var(--line); margin-top: 18px; }
+legend { font-family: var(--font-display); font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 16px 0 0; float: left; width: 100%; }
+legend + * { clear: both; }
+.field { display: grid; gap: 4px; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.field label { font-weight: 500; font-size: 14px; }
+.field .hint { color: var(--muted); font-size: 12px; }
+.num { display: flex; align-items: center; gap: 4px; }
+.num input { width: 7.5em; text-align: right; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.num span { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.phase-draw input[type="range"] { accent-color: var(--draw); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.results { display: grid; gap: 20px; min-width: 0; }
+.verdict { border-radius: 12px; padding: 20px 22px; display: grid; gap: 6px; border: 1px solid transparent; }
+.verdict.ok { background: var(--good-bg); }
+.verdict.short { background: var(--warn-bg); }
+.pill { justify-self: start; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; color: var(--surface); }
+.ok .pill { background: var(--good); }
+.short .pill { background: var(--warn); }
+.verdict h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 3vw, 30px); line-height: 1.15; margin: 4px 0 0; text-wrap: balance; }
+.verdict p { margin: 0; color: var(--ink); max-width: 70ch; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+@media (max-width: 640px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--surface); padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font-family: var(--font-mono); font-weight: 500; font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.stat .s { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+.chart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 12px; min-width: 0; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; margin-bottom: 8px; }
+.chart-head h3 { font-family: var(--font-display); font-weight: 500; font-size: 17px; margin: 0; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chart-box { position: relative; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis text { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.gridline { stroke: var(--line); stroke-width: 1; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-family: var(--font-mono); font-size: 12px; padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+.toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 12px; }
+.toggle button { font: inherit; background: transparent; color: var(--muted); border: 0; padding: 4px 10px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+.notes { color: var(--muted); font-size: 13px; max-width: 75ch; }
+.notes p { margin: 0 0 6px; }
+.reset { font: inherit; font-size: 13px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+.example { font-size: 12px; color: var(--muted); margin-top: 14px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+@media (prefers-reduced-motion: no-preference) { .verdict { transition: background-color .3s; } }
+</style>
+<style>
+:root { color-scheme: light; }
+body { margin: 0; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Retirement Runway</h1>
+      <p class="lede">See how far your savings carry you: what you build up while working, and how long it lasts once you start drawing it down. All figures are in today's money.</p>
+    </div>
+    <label class="cur" for="currency">Currency
+      <select id="currency">
+        <option value="SGD">S$ SGD</option>
+        <option value="USD">US$ USD</option>
+        <option value="MYR">RM MYR</option>
+        <option value="GBP">£ GBP</option>
+        <option value="EUR">€ EUR</option>
+        <option value="AUD">A$ AUD</option>
+      </select>
+    </label>
+  </header>
+
+  <div class="grid">
+    <form class="inputs" id="form" autocomplete="off">
+      <fieldset>
+        <legend>You</legend>
+        <div class="field" data-key="age" data-min="18" data-max="80" data-step="1" data-unit="yrs" data-label="Current age"></div>
+        <div class="field" data-key="retire" data-min="40" data-max="80" data-step="1" data-unit="yrs" data-label="Retirement age"></div>
+        <div class="field" data-key="life" data-min="60" data-max="110" data-step="1" data-unit="yrs" data-label="Plan until age" data-hint="Planning to 90+ is safer than using average life expectancy."></div>
+      </fieldset>
+      <fieldset>
+        <legend>Saving</legend>
+        <div class="field" data-key="savings" data-min="0" data-max="2000000" data-step="5000" data-unit="$" data-label="Savings today"></div>
+        <div class="field" data-key="monthly" data-min="0" data-max="10000" data-step="50" data-unit="$/mo" data-label="Monthly contribution"></div>
+        <div class="field" data-key="raise" data-min="0" data-max="8" data-step="0.5" data-unit="%/yr" data-label="Contribution increase" data-hint="How much you raise your contribution each year."></div>
+        <div class="field" data-key="rpre" data-min="0" data-max="10" data-step="0.25" data-unit="%/yr" data-label="Return before retiring"></div>
+      </fieldset>
+      <fieldset class="phase-draw">
+        <legend>Retired</legend>
+        <div class="field" data-key="spend" data-min="500" data-max="15000" data-step="100" data-unit="$/mo" data-label="Monthly spending" data-hint="In today's money. Rises with inflation."></div>
+        <div class="field" data-key="income" data-min="0" data-max="10000" data-step="50" data-unit="$/mo" data-label="Other monthly income" data-hint="Annuity, pension, rental or part-time pay, in today's money."></div>
+        <div class="field" data-key="incomeAge" data-min="55" data-max="80" data-step="1" data-unit="yrs" data-label="Other income starts at"></div>
+        <div class="field" data-key="rpost" data-min="0" data-max="10" data-step="0.25" data-unit="%/yr" data-label="Return after retiring"></div>
+        <div class="field" data-key="infl" data-min="0" data-max="8" data-step="0.25" data-unit="%/yr" data-label="Inflation"></div>
+      </fieldset>
+      <div class="example"><span id="exampleNote">Showing example figures. Replace them with yours.</span><button type="button" class="reset" id="reset">Reset to example</button></div>
+    </form>
+
+    <section class="results" aria-live="polite">
+      <div class="verdict" id="verdict">
+        <span class="pill" id="pill"></span>
+        <h2 id="headline"></h2>
+        <p id="detail"></p>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span class="k">At retirement</span><span class="v" id="sNest"></span><span class="s" id="sNestNom"></span></div>
+        <div class="stat"><span class="k">Money lasts until</span><span class="v" id="sLast"></span><span class="s" id="sLastSub"></span></div>
+        <div class="stat"><span class="k">Sustainable spending</span><span class="v" id="sSafe"></span><span class="s">per month, to plan age</span></div>
+        <div class="stat"><span class="k" id="sGapK">Extra saving needed</span><span class="v" id="sGap"></span><span class="s" id="sGapSub"></span></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Savings balance by age</h3>
+          <div class="legend">
+            <span><i style="background:var(--accent)"></i>Saving</span>
+            <span><i style="background:var(--draw)"></i>Drawing down</span>
+          </div>
+          <div class="toggle" role="group" aria-label="Money basis">
+            <button type="button" id="bReal" aria-pressed="true">Today's money</button>
+            <button type="button" id="bNom" aria-pressed="false">Future money</button>
+          </div>
+        </div>
+        <div class="chart-box" id="chartBox">
+          <svg id="chart" viewBox="0 0 760 320" role="img" aria-label="Savings balance by age"></svg>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <p>How this works: contributions are added monthly and grow each year by the increase you set. Returns compound monthly. From retirement, spending is withdrawn monthly and rises with inflation; other income offsets it from the age it starts. "Today's money" divides future amounts by cumulative inflation so you can compare them with prices now.</p>
+        <p>This is a planning estimate, not financial advice. Real returns vary year to year, and a run of bad years early in retirement can shorten the runway.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  const DEFAULTS = { age: 35, retire: 65, life: 90, savings: 150000, monthly: 1500, raise: 3, rpre: 5, spend: 3500, income: 1200, incomeAge: 65, rpost: 4, infl: 2.5 };
+  const SYMBOL = { SGD: "S$", USD: "US$", MYR: "RM", GBP: "£", EUR: "€", AUD: "A$" };
+  const STORE = "retirement-runway-v1";
+  let state = { ...DEFAULTS }, currency = "SGD", basis = "real";
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (saved && saved.state) { state = { ...DEFAULTS, ...saved.state }; currency = saved.currency || currency; }
+  } catch (e) {}
+
+  const sym = () => SYMBOL[currency] || "";
+  function money(v, compact) {
+    const neg = v < 0; v = Math.abs(v);
+    let s;
+    if (compact && v >= 1e6) s = (v / 1e6).toFixed(v >= 1e7 ? 1 : 2) + "M";
+    else if (compact && v >= 1e4) s = Math.round(v / 1e3) + "k";
+    else s = Math.round(v).toLocaleString("en-US");
+    return (neg ? "−" : "") + sym() + s;
+  }
+
+  // Build input rows
+  document.querySelectorAll(".field[data-key]").forEach(el => {
+    const k = el.dataset.key, unit = el.dataset.unit;
+    const u = unit.startsWith("$") ? unit.slice(1) : unit;
+    el.innerHTML =
+      `<div class="field-top"><label for="n-${k}">${el.dataset.label}</label>
+        <span class="num">${unit.startsWith("$") ? `<span class="cs"></span>` : ""}<input type="number" id="n-${k}" min="${el.dataset.min}" max="${el.dataset.max * 5}" step="${el.dataset.step}" inputmode="decimal">${u ? `<span>${u}</span>` : ""}</span></div>
+       <input type="range" id="r-${k}" aria-label="${el.dataset.label}" min="${el.dataset.min}" max="${el.dataset.max}" step="${el.dataset.step}">
+       ${el.dataset.hint ? `<span class="hint">${el.dataset.hint}</span>` : ""}`;
+    const n = el.querySelector("input[type=number]"), r = el.querySelector("input[type=range]");
+    n.addEventListener("input", () => { const v = parseFloat(n.value); if (!isNaN(v)) { state[k] = v; r.value = v; update(); } });
+    r.addEventListener("input", () => { state[k] = parseFloat(r.value); n.value = r.value; update(); });
+  });
+
+  function syncInputs() {
+    for (const k in state) {
+      const n = document.getElementById("n-" + k), r = document.getElementById("r-" + k);
+      if (n) n.value = state[k]; if (r) r.value = state[k];
+    }
+    document.querySelectorAll(".cs").forEach(s => s.textContent = sym());
+    document.getElementById("currency").value = currency;
+  }
+
+  // Monthly simulation. Returns yearly points (nominal + real) and the age money runs out.
+  function simulate(p, extraMonthly, spendOverride) {
+    const spend0 = spendOverride != null ? spendOverride : p.spend;
+    const mPre = Math.pow(1 + p.rpre / 100, 1 / 12) - 1;
+    const mPost = Math.pow(1 + p.rpost / 100, 1 / 12) - 1;
+    const mInf = Math.pow(1 + p.infl / 100, 1 / 12) - 1;
+    const months = Math.max(0, Math.round((p.life - p.age) * 12));
+    const retireM = Math.max(0, Math.round((p.retire - p.age) * 12));
+    const incomeM = Math.round((p.incomeAge - p.age) * 12);
+    let bal = p.savings, contrib = p.monthly + (extraMonthly || 0), infl = 1;
+    const pts = [{ age: p.age, nom: bal, real: bal }];
+    let nestNom = retireM === 0 ? bal : null, nestReal = nestNom, runOut = null;
+    for (let m = 0; m < months; m++) {
+      if (m > 0 && m % 12 === 0 && m < retireM) contrib *= 1 + p.raise / 100;
+      if (m < retireM) {
+        bal = bal * (1 + mPre) + contrib;
+      } else {
+        const need = spend0 * infl - (m >= incomeM ? p.income * infl : 0);
+        bal = bal * (1 + mPost) - need;
+      }
+      infl *= 1 + mInf;
+      if (m + 1 === retireM) { nestNom = bal; nestReal = bal / infl; }
+      if (bal < 0 && runOut === null && m >= retireM) runOut = p.age + (m + 1) / 12;
+      if ((m + 1) % 12 === 0) pts.push({ age: p.age + (m + 1) / 12, nom: Math.max(bal, 0), real: Math.max(bal, 0) / infl });
+    }
+    return { pts, nestNom, nestReal, runOut, endReal: bal / infl };
+  }
+
+  function solve(fn, lo, hi) { // find x where fn(x) crosses from >=0 to <0 (fn decreasing) or similar
+    for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (fn(mid)) lo = mid; else hi = mid; }
+    return lo;
+  }
+
+  function update() {
+    const p = { ...state };
+    p.retire = Math.max(p.retire, p.age); p.life = Math.max(p.life, p.retire + 1);
+    const res = simulate(p);
+    const lastsAll = res.runOut === null;
+    // Sustainable monthly spending (today's money) that just reaches plan age
+    const safe = solve(s => simulate(p, 0, s).endReal >= 0, 0, 100000);
+    // Extra monthly contribution needed
+    let gap = 0;
+    if (!lastsAll) gap = p.retire > p.age ? solve(x => simulate(p, x).endReal < 0, 0, 200000) : Infinity;
+
+    const v = document.getElementById("verdict");
+    v.className = "verdict " + (lastsAll ? "ok" : "short");
+    document.getElementById("pill").textContent = lastsAll ? "On track" : "Shortfall";
+    if (lastsAll) {
+      document.getElementById("headline").textContent = `Your savings last past age ${p.life}, with about ${money(res.endReal, true)} left over.`;
+      document.getElementById("detail").textContent = `You could spend up to ${money(safe)} a month in today's money and still reach age ${p.life}.`;
+    } else {
+      const yrs = res.runOut - p.retire;
+      document.getElementById("headline").textContent = `Your savings run out at about age ${Math.floor(res.runOut)}, ${Math.max(0, Math.round(p.life - res.runOut))} years before your plan age.`;
+      document.getElementById("detail").textContent = isFinite(gap)
+        ? `They cover roughly ${yrs.toFixed(1)} years of retirement. Saving an extra ${money(Math.ceil(gap / 10) * 10)} a month now, retiring later, or spending ${money(safe)} a month instead would close the gap.`
+        : `You're already at retirement age. Spending ${money(safe)} a month would make savings last to ${p.life}.`;
+    }
+
+    document.getElementById("sNest").textContent = money(res.nestReal, true);
+    document.getElementById("sNestNom").textContent = money(res.nestNom, true) + " in future money";
+    document.getElementById("sLast").textContent = lastsAll ? `${p.life}+` : `Age ${Math.floor(res.runOut)}`;
+    document.getElementById("sLastSub").textContent = lastsAll ? "beyond plan age" : `${(res.runOut - p.retire).toFixed(1)} yrs of retirement`;
+    document.getElementById("sSafe").textContent = money(safe);
+    document.getElementById("sGapK").textContent = lastsAll ? "Spare each month" : "Extra saving needed";
+    document.getElementById("sGap").textContent = lastsAll ? money(Math.max(0, safe - p.spend)) : (isFinite(gap) ? money(Math.ceil(gap / 10) * 10) : "—");
+    document.getElementById("sGapSub").textContent = lastsAll ? "spending headroom" : "per month, from today";
+
+    draw(res, p);
+    const isDefault = Object.keys(DEFAULTS).every(k => DEFAULTS[k] === state[k]);
+    document.getElementById("exampleNote").textContent = isDefault ? "Showing example figures. Replace them with yours." : "Using your figures.";
+    try { localStorage.setItem(STORE, JSON.stringify({ state, currency })); } catch (e) {}
+  }
+
+  // Chart
+  const svg = document.getElementById("chart"), tip = document.getElementById("tip"), box = document.getElementById("chartBox");
+  const W = 760, H = 320, M = { l: 62, r: 16, t: 14, b: 32 };
+  let lastDraw = null;
+  function niceStep(max) {
+    const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1))), n = raw / mag;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+  }
+  function draw(res, p) {
+    const key = basis, pts = res.pts;
+    const maxV = Math.max(1, ...pts.map(d => d[key]));
+    const step = niceStep(maxV), yMax = Math.ceil(maxV / step) * step;
+    const x0 = p.age, x1 = p.life;
+    const X = a => M.l + (a - x0) / Math.max(1, x1 - x0) * (W - M.l - M.r);
+    const Y = v => H - M.b - v / yMax * (H - M.t - M.b);
+    let g = "";
+    for (let v = 0; v <= yMax + 1e-6; v += step) {
+      g += `<line class="gridline" x1="${M.l}" x2="${W - M.r}" y1="${Y(v)}" y2="${Y(v)}"/>`;
+      g += `<text x="${M.l - 8}" y="${Y(v) + 4}" text-anchor="end">${money(v, true)}</text>`;
+    }
+    const span = x1 - x0, xs = span > 50 ? 10 : 5;
+    for (let a = Math.ceil(x0 / xs) * xs; a <= x1; a += xs) g += `<text x="${X(a)}" y="${H - 10}" text-anchor="middle">${a}</text>`;
+
+    const pre = pts.filter(d => d.age <= p.retire), post = pts.filter(d => d.age >= p.retire);
+    const area = (arr) => arr.length < 2 ? "" : `M${X(arr[0].age)},${Y(0)} ` + arr.map(d => `L${X(d.age)},${Y(d[key])}`).join(" ") + ` L${X(arr[arr.length - 1].age)},${Y(0)} Z`;
+    const line = (arr) => arr.length < 2 ? "" : arr.map((d, i) => `${i ? "L" : "M"}${X(d.age)},${Y(d[key])}`).join(" ");
+    let s = `<g class="axis">${g}</g>`;
+    s += `<path d="${area(pre)}" fill="var(--accent-soft)"/><path d="${line(pre)}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    s += `<path d="${area(post)}" fill="var(--draw-soft)"/><path d="${line(post)}" fill="none" stroke="var(--draw)" stroke-width="2.5" stroke-linejoin="round"/>`;
+    if (p.retire > p.age && p.retire < p.life) {
+      s += `<line x1="${X(p.retire)}" x2="${X(p.retire)}" y1="${M.t}" y2="${Y(0)}" stroke="var(--muted)" stroke-dasharray="3 4"/>`;
+      s += `<text x="${X(p.retire) + 6}" y="${M.t + 10}" fill="var(--muted)" font-family="var(--font-body)" font-size="12">Retire at ${p.retire}</text>`;
+    }
+    const peak = res.nestReal != null ? pts.reduce((a, b) => b[key] > a[key] ? b : a) : null;
+    if (peak) s += `<circle cx="${X(peak.age)}" cy="${Y(peak[key])}" r="4.5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"/>`;
+    if (res.runOut) {
+      s += `<circle cx="${X(res.runOut)}" cy="${Y(0)}" r="5" fill="var(--warn)"/>`;
+      const anchor = X(res.runOut) > W - 120 ? "end" : "start";
+      s += `<text x="${X(res.runOut) + (anchor === "end" ? -8 : 8)}" y="${Y(0) - 8}" text-anchor="${anchor}" fill="var(--warn)" font-family="var(--font-body)" font-size="12" font-weight="600">Runs out ~${Math.floor(res.runOut)}</text>`;
+    }
+    s += `<line id="hoverLine" x1="0" x2="0" y1="${M.t}" y2="${Y(0)}" stroke="var(--ink)" stroke-opacity="0.35" visibility="hidden"/>`;
+    s += `<circle id="hoverDot" r="4" fill="var(--ink)" visibility="hidden"/>`;
+    s += `<rect x="${M.l}" y="${M.t}" width="${W - M.l - M.r}" height="${H - M.t - M.b}" fill="transparent" id="hit"/>`;
+    svg.innerHTML = s;
+    lastDraw = { pts, X, Y, key, x0, x1 };
+    const hit = svg.getElementById ? svg.querySelector("#hit") : null;
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect(), cx = (ev.touches ? ev.touches[0].clientX : ev.clientX);
+      const vx = (cx - r.left) / r.width * W;
+      const age = x0 + (vx - M.l) / (W - M.l - M.r) * (x1 - x0);
+      const d = pts.reduce((a, b) => Math.abs(b.age - age) < Math.abs(a.age - age) ? b : a);
+      const px = X(d.age), py = Y(d[key]);
+      const hl = svg.querySelector("#hoverLine"), hd = svg.querySelector("#hoverDot");
+      hl.setAttribute("x1", px); hl.setAttribute("x2", px); hl.setAttribute("visibility", "visible");
+      hd.setAttribute("cx", px); hd.setAttribute("cy", py); hd.setAttribute("visibility", "visible");
+      tip.hidden = false;
+      tip.textContent = `Age ${Math.round(d.age)} · ${money(d[key])}`;
+      tip.style.left = (px / W * r.width) + "px";
+      tip.style.top = (py / H * r.height) + "px";
+    };
+    const leave = () => { tip.hidden = true; svg.querySelector("#hoverLine")?.setAttribute("visibility", "hidden"); svg.querySelector("#hoverDot")?.setAttribute("visibility", "hidden"); };
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchmove", move, { passive: true });
+    hit.addEventListener("mouseleave", leave); hit.addEventListener("touchend", leave);
+  }
+
+  document.getElementById("currency").addEventListener("change", e => { currency = e.target.value; syncInputs(); update(); });
+  document.getElementById("reset").addEventListener("click", () => { state = { ...DEFAULTS }; syncInputs(); update(); });
+  const bReal = document.getElementById("bReal"), bNom = document.getElementById("bNom");
+  bReal.addEventListener("click", () => { basis = "real"; bReal.setAttribute("aria-pressed", "true"); bNom.setAttribute("aria-pressed", "false"); update(); });
+  bNom.addEventListener("click", () => { basis = "nom"; bNom.setAttribute("aria-pressed", "true"); bReal.setAttribute("aria-pressed", "false"); update(); });
+  document.getElementById("form").addEventListener("submit", e => e.preventDefault());
+
+  syncInputs(); update();
+})();
+</script>
+</body>
+</html>
